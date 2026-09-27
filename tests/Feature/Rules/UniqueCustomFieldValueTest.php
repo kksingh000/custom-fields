@@ -197,6 +197,45 @@ describe('Create record — link field uniqueness via Livewire', function (): vo
     });
 });
 
+describe('Soft-deleted records', function (): void {
+    it('allows a domain only a soft-deleted record holds', function (): void {
+        $trashed = Post::factory()->create();
+        storeLinkValueForPost($trashed, $this->linkField, ['example.com']);
+        $trashed->delete();
+
+        livewire(CreatePost::class)
+            ->fillForm(validPostData([
+                'custom_fields' => [
+                    'domains' => ['example.com'],
+                ],
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+    });
+
+    it('allows a text value only a soft-deleted record holds', function (): void {
+        $trashed = Post::factory()->create();
+        storeTextValueForPost($trashed, $this->textField, 'my-slug');
+        $trashed->delete();
+
+        $validator = validator(['slug' => 'my-slug'], ['slug' => [new UniqueCustomFieldValue($this->textField)]]);
+
+        expect($validator->passes())->toBeTrue();
+    });
+
+    it('still blocks a value an active record holds next to a soft-deleted one', function (): void {
+        $trashed = Post::factory()->create();
+        storeTextValueForPost($trashed, $this->textField, 'my-slug');
+        $trashed->delete();
+        storeTextValueForPost(Post::factory()->create(), $this->textField, 'my-slug');
+
+        $validator = validator(['slug' => 'my-slug'], ['slug' => [new UniqueCustomFieldValue($this->textField)]]);
+
+        expect($validator->fails())->toBeTrue();
+    });
+});
+
 describe('Edit record — link field uniqueness via Livewire', function (): void {
     it('allows saving when domain belongs to the same record being edited', function (): void {
         $post = Post::factory()->create();
