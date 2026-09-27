@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
+use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTaken;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldSection;
 use Relaticle\CustomFields\Models\CustomFieldValue;
@@ -233,6 +235,48 @@ describe('Soft-deleted records', function (): void {
         $validator = validator(['slug' => 'my-slug'], ['slug' => [new UniqueCustomFieldValue($this->textField)]]);
 
         expect($validator->fails())->toBeTrue();
+    });
+});
+
+describe('Restoring soft-deleted records', function (): void {
+    it('refuses to restore a record whose unique value an active record now holds', function (): void {
+        $trashed = Post::factory()->create();
+        storeTextValueForPost($trashed, $this->textField, 'my-slug');
+        $trashed->delete();
+        storeTextValueForPost(Post::factory()->create(), $this->textField, 'my-slug');
+
+        expect(fn () => $trashed->restore())->toThrow(UniqueCustomFieldValueTaken::class, 'The value "my-slug" is already assigned to another record.')
+            ->and($trashed->fresh()->trashed())->toBeTrue();
+    });
+
+    it('restores a record when only another trashed record holds its value', function (): void {
+        $trashed = Post::factory()->create();
+        storeTextValueForPost($trashed, $this->textField, 'my-slug');
+        $trashed->delete();
+
+        $otherTrashed = Post::factory()->create();
+        storeTextValueForPost($otherTrashed, $this->textField, 'my-slug');
+        $otherTrashed->delete();
+
+        expect($trashed->restore())->toBeTrue()
+            ->and($trashed->fresh()->trashed())->toBeFalse();
+    });
+
+    it('lists only the values of a multi-value field that an active record took', function (): void {
+        $trashed = Post::factory()->create();
+        storeLinkValueForPost($trashed, $this->linkField, ['kept.com', 'taken.com']);
+        $trashed->delete();
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['taken.com']);
+
+        $taken = $trashed->takenUniqueCustomFieldValues();
+
+        expect($taken)->toHaveCount(1)
+            ->and($taken->first()['customField']->is($this->linkField))->toBeTrue()
+            ->and($taken->first()['value'])->toBe('taken.com');
+    });
+
+    it('does not report a refused restore as an error', function (): void {
+        expect(is_subclass_of(UniqueCustomFieldValueTaken::class, ShouldntReport::class))->toBeTrue();
     });
 });
 

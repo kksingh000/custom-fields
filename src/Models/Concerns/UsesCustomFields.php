@@ -13,11 +13,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
+use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTaken;
 use Relaticle\CustomFields\FeatureSystem\FeatureManager;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\QueryBuilders\CustomFieldQueryBuilder;
+use Relaticle\CustomFields\Rules\UniqueCustomFieldValue;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\CustomFields\Services\ValueResolver\LookupPreloader;
 
 /**
@@ -82,6 +85,40 @@ trait UsesCustomFields
 
             $model->customFieldValues()->delete();
         });
+
+        // A trashed record gives up its unique values, so it may only come back while they are still free.
+        static::registerModelEvent('restoring', function (Model $model): void {
+            $taken = $model->takenUniqueCustomFieldValues()->first();
+
+            if ($taken !== null) {
+                throw new UniqueCustomFieldValueTaken($model, $taken['customField'], $taken['value']);
+            }
+        });
+    }
+
+    /**
+     * @return Collection<int, array{customField: CustomField, value: string}>
+     */
+    public function takenUniqueCustomFieldValues(): Collection
+    {
+        $tenantKey = (string) config('custom-fields.database.column_names.tenant_foreign_key');
+
+        return $this->customFieldValues()
+            ->with('customField')
+            ->get()
+            ->filter(fn (CustomFieldValue $value): bool => $value->customField?->active && $value->customField->settings->unique_per_entity_type)
+            ->flatMap(fn (CustomFieldValue $value): Collection => TenantContextService::withTenant(
+                $value->getAttribute($tenantKey),
+                fn (): Collection => collect($value->getValue())
+                    ->filter(fn (mixed $candidate): bool => is_scalar($candidate) && filled($candidate))
+                    ->reject(fn (mixed $candidate): bool => validator(
+                        ['value' => $candidate],
+                        ['value' => [new UniqueCustomFieldValue($value->customField, $this->getKey())]],
+                    )->passes())
+                    ->map(fn (mixed $candidate): array => ['customField' => $value->customField, 'value' => (string) $candidate])
+                    ->values(),
+            ))
+            ->values();
     }
 
     /**
