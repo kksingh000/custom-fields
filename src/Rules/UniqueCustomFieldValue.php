@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
@@ -111,6 +112,15 @@ final class UniqueCustomFieldValue implements ValidationRule
 
         if ($this->ignoreEntityId !== null) {
             $query->where('entity_id', '!=', $this->ignoreEntityId);
+        }
+
+        // Only the trashed rows are excluded: a host app's other entity scopes must never hide a taken value.
+        if (in_array(SoftDeletes::class, class_uses_recursive($entityClass), true)) {
+            $entity = new $entityClass;
+
+            $query->whereNotIn('entity_id', $entity->newQueryWithoutScopes()
+                ->select($entity->getKeyName())
+                ->whereNotNull($entity->getQualifiedDeletedAtColumn()));
         }
 
         return $query;
