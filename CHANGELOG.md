@@ -2,6 +2,34 @@
 
 All notable changes to `custom-fields` will be documented in this file.
 
+## v3.10.0 - 2026-09-29
+
+<!-- Release notes generated using configuration in .github/release.yml at v3.10.0 -->
+### What's Changed
+
+#### Other Changes
+
+* chore(deps): bump svgo from 4.0.2 to 4.1.0 in /docs in the npm-security group across 1 directory by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/224
+* chore(deps-dev): bump the npm group with 3 updates by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/228
+* fix(ci): adopt new lint rules by pull request, re-check at merge by @ManukMinasyan in https://github.com/relaticle/custom-fields/pull/230
+* chore(docs): override the transitive deps Dependabot cannot reach by @ManukMinasyan in https://github.com/relaticle/custom-fields/pull/231
+* chore(deps-dev): bump the npm group with 2 updates by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/233
+* chore(deps): bump zizmorcore/zizmor-action from 0.6.3 to 0.6.4 in the github-actions group by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/234
+* chore(deps): bump the npm group in /docs with 3 updates by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/235
+* chore(deps): bump devalue from 5.9.0 to 5.9.2 in /docs in the npm-security group across 1 directory by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/232
+* chore(deps): bump the npm group in /docs with 2 updates by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/239
+* fix: release unique custom field values on soft delete and guard restore by @ManukMinasyan in https://github.com/relaticle/custom-fields/pull/240
+* chore(deps-dev): bump cssnano from 9.0.4 to 9.0.5 in the npm group by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/238
+* fix(ci): deploy the docs after a token merge by @ManukMinasyan in https://github.com/relaticle/custom-fields/pull/221
+* chore(deps): bump fast-uri from 3.1.6 to 3.1.8 in /docs in the npm-security group across 1 directory by @dependabot[bot] in https://github.com/relaticle/custom-fields/pull/241
+* perf: memoise extractFieldValues() and the field type registry lookup by @MyKineID in https://github.com/relaticle/custom-fields/pull/237
+
+### New Contributors
+
+* @MyKineID made their first contribution in https://github.com/relaticle/custom-fields/pull/237
+
+**Full Changelog**: https://github.com/relaticle/custom-fields/compare/v3.9.1...v3.10.0
+
 ## v3.9.1 - 2026-09-08
 
 <!-- Release notes generated using configuration in .github/release.yml at 3.x -->
@@ -128,6 +156,7 @@ This is a taste change, not a bug fix. It carries no performance benefit: filter
         'min_search_length' => 2,
     ],
 ],
+
 
 
 
