@@ -12,8 +12,10 @@ use Relaticle\CustomFields\Facades\Entities;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldSection;
+use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\Options\ComponentOptionsExtractor;
 use Throwable;
+use WeakMap;
 
 /**
  * Backend Visibility Service
@@ -33,10 +35,17 @@ final class BackendVisibilityService
      */
     private static array $fieldCache = [];
 
+    /**
+     * @var WeakMap<Collection<int, CustomFieldValue>, array<string, array<string, mixed>>>
+     */
+    private readonly WeakMap $extractedValues;
+
     public function __construct(
         private readonly CoreVisibilityLogicService $coreLogic,
         private readonly ComponentOptionsExtractor $optionsExtractor,
-    ) {}
+    ) {
+        $this->extractedValues = new WeakMap;
+    }
 
     /**
      * Get cached fields for an entity type (O(1) lookup by code).
@@ -84,14 +93,9 @@ final class BackendVisibilityService
             $record->load('customFieldValues.customField');
         }
 
-        // Memoise against the loaded relation object so the memo has exactly
-        // the lifetime of the relation this method caches above: a refresh()
-        // or load() installs a new collection and drops the memo with it.
-        static $cache = null;
-        $cache ??= new \WeakMap();
         $loadedValues = $record->getRelation('customFieldValues');
         $signature = $fields->pluck('id')->implode(',');
-        $memoised = $cache[$loadedValues] ?? [];
+        $memoised = $this->extractedValues[$loadedValues] ?? [];
 
         if (array_key_exists($signature, $memoised)) {
             return $memoised[$signature];
@@ -108,7 +112,7 @@ final class BackendVisibilityService
         }
 
         $memoised[$signature] = $fieldValues;
-        $cache[$loadedValues] = $memoised;
+        $this->extractedValues[$loadedValues] = $memoised;
 
         return $fieldValues;
     }

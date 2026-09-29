@@ -76,10 +76,7 @@ final class FieldManager
      */
     private array $cachedInstances = [];
 
-    /**
-     * @var array<string, FieldTypeData|null>
-     */
-    private array $cachedFieldTypeData = [];
+    private FieldTypeCollection $cachedCollection;
 
     /**
      * @param  array<string, array<int, string> | string> | Closure  $fieldTypes
@@ -137,11 +134,7 @@ final class FieldManager
             return null;
         }
 
-        if (! array_key_exists($fieldType, $this->cachedFieldTypeData)) {
-            $this->cachedFieldTypeData[$fieldType] = $this->toCollection()->firstWhere('key', $fieldType);
-        }
-
-        return $this->cachedFieldTypeData[$fieldType];
+        return $this->toCollection()->firstWhere('key', $fieldType);
     }
 
     /**
@@ -161,6 +154,10 @@ final class FieldManager
 
     public function toCollection(): FieldTypeCollection
     {
+        if (isset($this->cachedCollection)) {
+            return $this->cachedCollection;
+        }
+
         $fieldTypes = [];
 
         foreach ($this->getFieldTypes() as $fieldTypeClass) {
@@ -176,6 +173,6 @@ final class FieldManager
             $this->cachedInstances[$data->key] = $fieldType;
         }
 
-        return FieldTypeCollection::make($fieldTypes)->sortBy('priority', SORT_NATURAL)->values();
+        return $this->cachedCollection = FieldTypeCollection::make($fieldTypes)->sortBy('priority', SORT_NATURAL)->values();
     }
 }
