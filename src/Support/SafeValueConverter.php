@@ -54,12 +54,19 @@ class SafeValueConverter
         if (is_array($converted)) {
             return collect($converted)
                 ->map(fn (mixed $item): mixed => is_string($item) && $item !== '' ? $definition->normalize($item, $customField) : $item)
+                ->reject(fn (mixed $item): bool => $item === '')
                 ->unique(strict: true)
                 ->values()
                 ->all();
         }
 
-        return is_string($converted) && $converted !== '' ? $definition->normalize($converted, $customField) : $converted;
+        if (! is_string($converted) || $converted === '') {
+            return $converted;
+        }
+
+        $normalized = $definition->normalize($converted, $customField);
+
+        return $normalized === '' ? null : $normalized;
     }
 
     public static function convertByDataType(mixed $value, FieldDataType $dataType): mixed
