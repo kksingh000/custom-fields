@@ -13,6 +13,7 @@ use Illuminate\Support\Arr;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\FeatureSystem\FeatureManager;
+use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\FieldTypeSystem\FieldManager;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -35,7 +36,7 @@ final class UniqueCustomFieldValue implements ValidationRule
         $normalizedByOriginal = collect(Arr::wrap($value))
             ->reject(fn (mixed $v): bool => blank($v) || ! is_scalar($v))
             ->mapWithKeys(fn (mixed $v): array => [
-                (string) $v => $fieldType?->setValue((string) $v) ?? (string) $v,
+                (string) $v => $fieldType instanceof BaseFieldType ? $fieldType->normalize((string) $v, $this->customField) : (string) $v,
             ]);
 
         if ($normalizedByOriginal->isEmpty()) {
