@@ -606,3 +606,148 @@ describe('Morph alias resolution', function (): void {
         expect($errors)->toBeEmpty();
     });
 });
+
+describe('Grandfathered values on save', function (): void {
+    it('lets a record keep a unique value another record already shares', function (): void {
+        $kept = Post::factory()->create();
+        storeLinkValueForPost($kept, $this->linkField, ['acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['acme.com']);
+
+        $validator = validator(['v' => ['acme.com']], ['v' => [new UniqueCustomFieldValue($this->linkField, $kept->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeTrue();
+    });
+
+    it('lets a record keep a shared value submitted in another format', function (): void {
+        $kept = Post::factory()->create();
+        storeLinkValueForPost($kept, $this->linkField, ['acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['acme.com']);
+
+        $validator = validator(['v' => ['https://acme.com']], ['v' => [new UniqueCustomFieldValue($this->linkField, $kept->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeTrue();
+    });
+
+    it('rejects a value the record did not hold before in any format', function (): void {
+        $taken = Post::factory()->create();
+        $editing = Post::factory()->create();
+        storeLinkValueForPost($taken, $this->linkField, ['acme.com']);
+
+        $validator = validator(['v' => ['https://acme.com']], ['v' => [new UniqueCustomFieldValue($this->linkField, $editing->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeFalse();
+    });
+
+    it('rejects a newly added taken value next to a kept shared one', function (): void {
+        $editing = Post::factory()->create();
+        storeLinkValueForPost($editing, $this->linkField, ['shared.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['shared.com', 'taken.com']);
+
+        $validator = validator(['v' => ['shared.com', 'taken.com']], ['v' => [new UniqueCustomFieldValue($this->linkField, $editing->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeFalse();
+    });
+
+    it('keeps rejecting a shared value for the record that holds it when no exception is asked for', function (): void {
+        $kept = Post::factory()->create();
+        storeLinkValueForPost($kept, $this->linkField, ['acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['acme.com']);
+
+        $validator = validator(['v' => ['acme.com']], ['v' => [new UniqueCustomFieldValue($this->linkField, $kept->getKey())]]);
+
+        expect($validator->passes())->toBeFalse();
+    });
+
+    it('treats a text value the record holds as its own', function (): void {
+        $kept = Post::factory()->create();
+        storeTextValueForPost($kept, $this->textField, 'my-slug');
+        storeTextValueForPost(Post::factory()->create(), $this->textField, 'my-slug');
+
+        $validator = validator(['v' => 'my-slug'], ['v' => [new UniqueCustomFieldValue($this->textField, $kept->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeTrue();
+    });
+
+    it('normalizes candidates with the field setting so a domain variant catches a pasted url', function (): void {
+        $domainField = CustomField::factory()->create([
+            'custom_field_section_id' => $this->section->getKey(),
+            'entity_type' => Post::class,
+            'code' => 'company_domain',
+            'name' => 'Company domain',
+            'type' => 'link',
+            'settings' => new CustomFieldSettingsData(
+                allow_multiple: true,
+                max_values: 5,
+                unique_per_entity_type: true,
+                additional: ['link_variant' => 'domain'],
+            ),
+        ]);
+        storeLinkValueForPost(Post::factory()->create(), $domainField, ['acme.com']);
+        $editing = Post::factory()->create();
+
+        $validator = validator(['v' => ['https://www.acme.com/pricing']], ['v' => [new UniqueCustomFieldValue($domainField, $editing->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeFalse();
+    });
+
+    it('matches a held value stored in a legacy format against the domain variant', function (): void {
+        $domainField = CustomField::factory()->create([
+            'custom_field_section_id' => $this->section->getKey(),
+            'entity_type' => Post::class,
+            'code' => 'company_domain',
+            'name' => 'Company domain',
+            'type' => 'link',
+            'settings' => new CustomFieldSettingsData(
+                allow_multiple: true,
+                max_values: 5,
+                unique_per_entity_type: true,
+                additional: ['link_variant' => 'domain'],
+            ),
+        ]);
+        $kept = Post::factory()->create();
+        storeLinkValueForPost($kept, $domainField, ['www.acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $domainField, ['acme.com']);
+
+        $validator = validator(['v' => ['https://acme.com/about']], ['v' => [new UniqueCustomFieldValue($domainField, $kept->getKey(), exceptHeldValues: true)]]);
+
+        expect($validator->passes())->toBeTrue();
+    });
+
+    it('still blocks restoring a trashed record whose value is taken', function (): void {
+        $trashed = Post::factory()->create();
+        $trashed->saveCustomFieldValue($this->linkField, ['acme.com']);
+        $trashed->delete();
+        Post::factory()->create()->saveCustomFieldValue($this->linkField, ['acme.com']);
+
+        expect($trashed->takenUniqueCustomFieldValues())->not->toBeEmpty();
+    });
+
+    it('saves an edit that leaves a shared unique value untouched', function (): void {
+        $kept = Post::factory()->create();
+        storeLinkValueForPost($kept, $this->linkField, ['acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['acme.com']);
+
+        livewire(EditPost::class, ['record' => $kept->getKey()])
+            ->fillForm(['title' => 'Renamed'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($kept->fresh()->title)->toBe('Renamed');
+    });
+
+    it('blocks an edit that adds a taken value next to a kept shared one', function (): void {
+        $kept = Post::factory()->create();
+        storeLinkValueForPost($kept, $this->linkField, ['acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['acme.com']);
+        storeLinkValueForPost(Post::factory()->create(), $this->linkField, ['taken.com']);
+
+        livewire(EditPost::class, ['record' => $kept->getKey()])
+            ->fillForm([
+                'custom_fields' => [
+                    'domains' => ['acme.com', 'taken.com'],
+                ],
+            ])
+            ->call('save')
+            ->assertHasFormErrors(['custom_fields.domains']);
+    });
+});

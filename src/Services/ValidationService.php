@@ -232,7 +232,7 @@ final class ValidationService
 
         // Handle unique per entity type setting (available for any field type)
         if ($customField->settings->unique_per_entity_type) {
-            $rules[] = new UniqueCustomFieldValue($customField, $ignoreEntityId);
+            $rules[] = new UniqueCustomFieldValue($customField, $ignoreEntityId, exceptHeldValues: true);
         }
 
         // Currency fields: enforce decimal places from settings
