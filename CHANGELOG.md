@@ -2,6 +2,17 @@
 
 All notable changes to `custom-fields` will be documented in this file.
 
+## v3.11.0 - 2026-10-02
+
+<!-- Release notes generated using configuration in .github/release.yml at v3.11.0 -->
+### What's Changed
+
+#### Other Changes
+
+* fix(filters): match any picked value in multi-value table filters by @ManukMinasyan in https://github.com/relaticle/custom-fields/pull/243
+
+**Full Changelog**: https://github.com/relaticle/custom-fields/compare/v3.10.0...v3.11.0
+
 ## v3.10.0 - 2026-09-29
 
 <!-- Release notes generated using configuration in .github/release.yml at v3.10.0 -->
@@ -156,6 +167,7 @@ This is a taste change, not a bug fix. It carries no performance benefit: filter
         'min_search_length' => 2,
     ],
 ],
+
 
 
 
