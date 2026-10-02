@@ -81,3 +81,52 @@ it('keeps a phone extension and stays stable when saved twice', function (): voi
     expect($once)->toBe(['+14155550100;ext=12'])
         ->and(SafeValueConverter::toDbSafe($once, 'phone', $phoneField))->toBe($once);
 });
+
+dataset('domain links', [
+    'scheme, www and path' => 'https://www.Acme.com/pricing?x=1#top',
+    'bare' => 'acme.com',
+    'userinfo and port' => 'http://user:secret@acme.com:8080/',
+    'trailing dot' => 'ACME.COM.',
+    'padded' => '  www.acme.com  ',
+    'at sign in the query' => 'acme.com?ref=a@b.com',
+    'port and trailing dot' => 'acme.com:8080.',
+    'repeated www' => 'www.www.acme.com',
+]);
+
+it('stores a domain-variant link as its bare lowercase host', function (string $input): void {
+    $this->linkField->update(['settings' => new CustomFieldSettingsData(
+        allow_multiple: true,
+        max_values: 5,
+        additional: ['link_variant' => 'domain'],
+    )]);
+
+    expect(SafeValueConverter::toDbSafe([$input], 'link', $this->linkField->refresh()))->toBe(['acme.com']);
+})->with('domain links');
+
+it('normalizes a domain-variant link to the same value when applied twice', function (string $input): void {
+    $this->linkField->update(['settings' => new CustomFieldSettingsData(
+        allow_multiple: true,
+        max_values: 5,
+        additional: ['link_variant' => 'domain'],
+    )]);
+    $field = $this->linkField->refresh();
+
+    $once = SafeValueConverter::toDbSafe([$input], 'link', $field);
+
+    expect(SafeValueConverter::toDbSafe($once, 'link', $field))->toBe($once);
+})->with('domain links');
+
+it('keeps the path of a url-variant link', function (?string $variant): void {
+    $additional = $variant === null ? [] : ['link_variant' => $variant];
+    $this->linkField->update(['settings' => new CustomFieldSettingsData(
+        allow_multiple: true,
+        max_values: 5,
+        additional: $additional,
+    )]);
+
+    expect(SafeValueConverter::toDbSafe(['HTTPS://www.LinkedIn.com/Company/Acme', '  http://acme.com/Path  '], 'link', $this->linkField->refresh()))
+        ->toBe(['www.LinkedIn.com/Company/Acme', 'acme.com/Path']);
+})->with([
+    'no variant' => null,
+    'url variant' => 'url',
+]);
