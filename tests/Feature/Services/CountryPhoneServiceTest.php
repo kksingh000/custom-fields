@@ -106,6 +106,16 @@ it('normalizes an international number to E.164', function (string $input, strin
     'italian leading zero' => ['+39 06 1234 5678', '+390612345678'],
     'extension' => ['+1 (415) 555-0100 ext. 12', '+14155550100;ext=12'],
     'already canonical' => ['+14155550100;ext=12', '+14155550100;ext=12'],
+    'short number' => ['+1-555-0101', '+15550101'],
+]);
+
+it('leaves a number with a text label unchanged', function (string $input, string $expected): void {
+    expect($this->service->normalize($input))->toBe($expected);
+})->with([
+    'mobile label' => ['+1 415 555 0100 (mobile)', '+1 415 555 0100 (mobile)'],
+    'office label' => ['+44 20 7946 0958 (office)', '+44 20 7946 0958 (office)'],
+    'cell suffix' => ['+1 415 555 0100 cell', '+1 415 555 0100 cell'],
+    'padded label' => ['  +1 415 555 0100 (mobile)  ', '+1 415 555 0100 (mobile)'],
 ]);
 
 it('returns a national number without a country unchanged', function (): void {
@@ -123,12 +133,30 @@ it('normalizes to the same value when applied twice', function (string $input): 
     'italian leading zero' => ['+39 06 1234 5678'],
     'unparsable' => [' 555-123-4567 '],
     'garbage' => ['not a phone'],
+    'label' => ['+1 415 555 0100 (mobile)'],
 ]);
 
 it('keeps the extension through the panel input and display', function (): void {
-    $e164 = $this->service->formatToE164('US', '4155550100 ext. 12');
+    $stored = '+14155550100;ext=12';
 
-    expect($e164)->toBe('+14155550100;ext=12')
-        ->and($this->service->parseE164($e164))->toBe(['country' => 'US', 'number' => '4155550100 ext. 12'])
-        ->and($this->service->formatToE164('US', '4155550100 ext. 12'))->toBe($e164);
+    $parsed = $this->service->parseE164($stored);
+
+    expect($parsed)->toBe(['country' => 'US', 'number' => '4155550100 ext. 12'])
+        ->and($this->service->formatToE164($parsed['country'], $parsed['number']))->toBe($stored);
 });
+
+it('keeps the leading zero through the panel input', function (): void {
+    $parsed = $this->service->parseE164('+390612345678');
+
+    expect($parsed)->toBe(['country' => 'IT', 'number' => '0612345678'])
+        ->and($this->service->formatToE164($parsed['country'], $parsed['number']))->toBe('+390612345678');
+});
+
+it('shows the international format with the extension and dials the number alone', function (string $stored, string $display, string $dial): void {
+    expect($this->service->displayText($stored))->toBe($display)
+        ->and($this->service->dialNumber($stored))->toBe($dial);
+})->with([
+    'extension' => ['+14155550100;ext=12', '+1 415-555-0100 ext. 12', '+14155550100'],
+    'no extension' => ['+14155550100', '+14155550100', '+14155550100'],
+    'legacy spaced value' => ['+1 415 555 0100', '+1 415 555 0100', '+14155550100'],
+]);
