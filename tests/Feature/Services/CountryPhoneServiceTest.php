@@ -97,3 +97,38 @@ it('handles formatting with fallback for invalid numbers', function (): void {
     $e164 = $this->service->formatToE164('US', '123');
     expect($e164)->not->toBeNull();
 });
+
+it('normalizes an international number to E.164', function (string $input, string $expected): void {
+    expect($this->service->normalize($input))->toBe($expected);
+})->with([
+    'spaces and dashes' => ['+1 415-555-0100', '+14155550100'],
+    'parentheses' => ['+1 (415) 555-0100', '+14155550100'],
+    'italian leading zero' => ['+39 06 1234 5678', '+390612345678'],
+    'extension' => ['+1 (415) 555-0100 ext. 12', '+14155550100;ext=12'],
+    'already canonical' => ['+14155550100;ext=12', '+14155550100;ext=12'],
+]);
+
+it('returns a national number without a country unchanged', function (): void {
+    expect($this->service->normalize(' 555-123-4567 '))->toBe('555-123-4567');
+});
+
+it('normalizes to the same value when applied twice', function (string $input): void {
+    $once = $this->service->normalize($input);
+
+    expect($this->service->normalize($once))->toBe($once);
+})->with([
+    'plain' => ['+1 415-555-0100'],
+    'extension' => ['+1 (415) 555-0100 ext. 12'],
+    'canonical extension' => ['+14155550100;ext=12'],
+    'italian leading zero' => ['+39 06 1234 5678'],
+    'unparsable' => [' 555-123-4567 '],
+    'garbage' => ['not a phone'],
+]);
+
+it('keeps the extension through the panel input and display', function (): void {
+    $e164 = $this->service->formatToE164('US', '4155550100 ext. 12');
+
+    expect($e164)->toBe('+14155550100;ext=12')
+        ->and($this->service->parseE164($e164))->toBe(['country' => 'US', 'number' => '4155550100 ext. 12'])
+        ->and($this->service->formatToE164('US', '4155550100 ext. 12'))->toBe($e164);
+});
