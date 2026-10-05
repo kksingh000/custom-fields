@@ -6,12 +6,6 @@ use Relaticle\CustomFields\Enums\FieldDataType;
 
 trait HasFieldType
 {
-    /**
-     * $typeData resolves to null when this field's `type` isn't in the
-     * registry (disabled via config, or renamed between versions). A field
-     * we can't classify is conservatively treated as "none of the above"
-     * rather than fataling on a null relation.
-     */
     public function isChoiceField(): bool
     {
         return $this->typeData?->dataType->isChoiceField() ?? false;

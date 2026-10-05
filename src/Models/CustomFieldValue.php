@@ -18,6 +18,7 @@ use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\Scopes\TenantScope;
 use Relaticle\CustomFields\Support\SafeValueConverter;
+use RuntimeException;
 
 /**
  * @property int $id
@@ -79,20 +80,14 @@ class CustomFieldValue extends Model
     }
 
     /**
-     * @throws \RuntimeException if $fieldType isn't in the field type
-     *                            registry (disabled via config, or renamed
-     *                            between versions). Callers that may be
-     *                            handed a stale/unregistered type -- such
-     *                            as getValue()/setValue() below -- check
-     *                            CustomFieldsType::getFieldType() first
-     *                            instead of letting this throw.
+     * @throws RuntimeException
      */
     public static function getValueColumn(string $fieldType): string
     {
         $resolvedFieldType = CustomFieldsType::getFieldType($fieldType);
 
         if (! $resolvedFieldType instanceof FieldTypeData) {
-            throw new \RuntimeException("Unable to resolve the value column for unregistered field type [{$fieldType}].");
+            throw new RuntimeException("Unable to resolve the value column for unregistered field type [{$fieldType}].");
         }
 
         $dataType = $resolvedFieldType->dataType;
@@ -129,12 +124,7 @@ class CustomFieldValue extends Model
 
     public function getValue(): mixed
     {
-        // The owning CustomField can be gone by the time this row is read
-        // (deactivated, or its section deactivated), or still present but
-        // pointing at a field type that's no longer registered (disabled
-        // via config, or renamed between versions) -- while this value
-        // row is untouched either way. Treat both as "no value" rather
-        // than fatal.
+        // A deactivated field resolves to null here, and a disabled type has no column.
         if (! $this->hasResolvableFieldType()) {
             return null;
         }
@@ -144,12 +134,13 @@ class CustomFieldValue extends Model
         return $this->$column;
     }
 
+    /**
+     * @throws RuntimeException
+     */
     public function setValue(mixed $value): void
     {
-        // Without a resolvable field type we don't know which column
-        // stores this field's values, so there's nothing safe to write.
-        if (! $this->hasResolvableFieldType()) {
-            return;
+        if (! $this->customField instanceof CustomField) {
+            throw new RuntimeException("Unable to set a value for custom field [{$this->custom_field_id}]: the field is inactive or outside the current scope.");
         }
 
         $column = static::getValueColumn($this->customField->type);
@@ -164,11 +155,6 @@ class CustomFieldValue extends Model
         $this->$column = $safeValue;
     }
 
-    /**
-     * Whether this row's field is still present and its type still
-     * registered, i.e. whether getValueColumn() can safely resolve a
-     * column for it.
-     */
     private function hasResolvableFieldType(): bool
     {
         return $this->customField instanceof CustomField
